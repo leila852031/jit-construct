@@ -38,26 +38,27 @@ int main(int argc, char *argv[])
 
 	for (char *p = read_file(argv[1]); *p; p++) {
 		switch (*p) {
+		case '+':
+			|  inc  byte [PTR]
+			break;
 		case '>':
 			|  inc  PTR
 			break;
 		case '<':
 			|  dec  PTR
 			break;
-		case '+':
-			|  inc  byte [PTR]
-			break;
 		case '-':
 			|  dec  byte [PTR]
 			break;
-		case '.':
-			|  movzx edi, byte [PTR]
-			|  callp putchar
-			break;
-		case ',':
-			|  callp getchar
+                case '.':
+                        |  movzx edi, byte [PTR]
+                        |  callp putchar
+                        break;
+                case ',':
+                        |  callp getchar                        
 			|  mov   byte [PTR], al
-			break;
+                        break;   
+
 		case '[':
 			if (top == limit) err("Nesting too deep.");
 			// Each loop gets two pclabels: at the beginning and end.
@@ -91,3 +92,4 @@ int main(int argc, char *argv[])
 	free_jitcode(fptr);
 	return 0;
 }
+
