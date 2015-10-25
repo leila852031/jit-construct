@@ -35,20 +35,37 @@ int main(int argc, char *argv[])
 	// Function prologue.
 	|  push PTR
 	|  mov  PTR, rdi      // rdi store 1st argument
-
+	int count;
 	for (char *p = read_file(argv[1]); *p; p++) {
+		count=0;
 		switch (*p) {
 		case '+':
-			|  inc  byte [PTR]
+			do{
+			   count++;
+			}while(*(++p)=='+');
+			p--;
+			|  add  byte [PTR], count
 			break;
 		case '>':
-			|  inc  PTR
+			do{
+			   count++;
+			}while(*(++p)=='>');
+			p--;
+			|  add  PTR, count
 			break;
 		case '<':
-			|  dec  PTR
+			do{
+			   count++;
+			}while(*(++p)=='<');
+			p--;
+			|  sub  PTR, count
 			break;
 		case '-':
-			|  dec  byte [PTR]
+			do{
+			   count++;
+			}while(*(++p)=='-');
+			p--;
+			|  sub  byte [PTR], count
 			break;
                 case '.':
                         |  movzx edi, byte [PTR]
@@ -92,4 +109,7 @@ int main(int argc, char *argv[])
 	free_jitcode(fptr);
 	return 0;
 }
+
+
+
 
