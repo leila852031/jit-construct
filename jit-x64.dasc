@@ -24,97 +24,92 @@
 
 int main(int argc, char *argv[])
 {
-	if (argc < 2) err("Usage: jit-x64 <inputfile>");
-	dasm_State *state;
-	initjit(&state, actions);
+    if (argc < 2) err("Usage: jit-x64 <inputfile>");
+    dasm_State *state;
+    initjit(&state, actions);
 
-	unsigned int maxpc = 0;
-	int pcstack[MAX_NESTING];
-	int *top = pcstack, *limit = pcstack + MAX_NESTING;
+    unsigned int maxpc = 0;
+    int pcstack[MAX_NESTING];
+    int *top = pcstack, *limit = pcstack + MAX_NESTING;
 
-	// Function prologue.
-	|  push PTR
-	|  mov  PTR, rdi      // rdi store 1st argument
-	int count;
-	for (char *p = read_file(argv[1]); *p; p++) {
-		count=0;
-		switch (*p) {
-		case '+':
-			do{
-			   count++;
-			}while(*(++p)=='+');
-			p--;
-			|  add  byte [PTR], count
-			break;
-		case '>':
-			do{
-			   count++;
-			}while(*(++p)=='>');
-			p--;
-			|  add  PTR, count
-			break;
-		case '<':
-			do{
-			   count++;
-			}while(*(++p)=='<');
-			p--;
-			|  sub  PTR, count
-			break;
-		case '-':
-			do{
-			   count++;
-			}while(*(++p)=='-');
-			p--;
-			|  sub  byte [PTR], count
-			break;
-                case '.':
-                        |  movzx edi, byte [PTR]
-                        |  callp putchar
-                        break;
-                case ',':
-                        |  callp getchar                        
-			|  mov   byte [PTR], al
-                        break;   
+    // Function prologue.
+    |  push PTR
+    |  mov  PTR, rdi      // rdi store 1st argument
+    int val;
+    char character[8] = {'+', '>', '<', '-', '.', ',', '[', ']' };
+    void *tInstruction[10] = {&&la, &&lg, &&ls, &&lm, &&ld, &&lc, &&ll, &&lr, &&le, &&lb};
+#define instruction() {goto *(tInstruction[val]);}
 
-		case '[':
-			if (top == limit) err("Nesting too deep.");
-			// Each loop gets two pclabels: at the beginning and end.
-			// We store pclabel offsets in a stack to link the loop
-			// begin and end together.
-			if((*(p+1)=='-') && (*(p+2)==']')){
-			   |  mov   byte[PTR], 0
-			   p+=2;
-			   break;
-			}
-			maxpc += 2;
-			*top++ = maxpc;
-			dasm_growpc(&state, maxpc);
-			|  cmp  byte [PTR], 0
-			|  je   =>(maxpc-2)
-			|=>(maxpc-1):
-			break;
-		case ']':
-			if (top == pcstack) err("Unmatched ']'");
-			top--;
-			|  cmp  byte [PTR], 0
-			|  jne  =>(*top-1)
-			|=>(*top-2):
-			break;
-		}
-	}
+    char *p = read_file(argv[1]);
 
-	// Function epilogue.
-	|  pop  PTR
-	|  ret
+lb:
+    if(*p) {
+        for(val=0; val<8; val++)
+            if(*p==character[val]) instruction();
+        p++;
+        goto *(tInstruction[9]);
+    } else {
+        goto *(tInstruction[8]);
+    }
+la:
+    |  inc  byte [PTR]
+    p++;
+    goto *(tInstruction[9]);
+lg:
+    |  inc  PTR
+    p++;
+    goto *(tInstruction[9]);
+ls:
+    |  dec  PTR
+    p++;
+    goto *(tInstruction[9]);
+lm:
+    |  dec  byte [PTR]
+    p++;
+    goto *(tInstruction[9]);
+ld:
+    |  movzx edi, byte [PTR]
+    |  callp putchar
+    p++;
+    goto *(tInstruction[9]);
+lc:
+    |  callp getchar
+    |  mov   byte [PTR], al
+    p++;
+    goto *(tInstruction[9]);
 
-	void (*fptr)(char*) = jitcode(&state);
-	char *mem = calloc(30000, 1);
-	fptr(mem);
-	free(mem);
-	free_jitcode(fptr);
-	return 0;
+ll:
+    if (top == limit) err("Nesting too deep.");
+    // Each loop gets two pclabels: at the beginning and end.
+    // We store pclabel offsets in a stack to link the loop
+    // begin and end together.
+    maxpc += 2;
+    *top++ = maxpc;
+    dasm_growpc(&state, maxpc);
+    |  cmp  byte [PTR], 0
+    |  je   =>(maxpc-2)
+    |=>(maxpc-1):
+          p++;
+    goto *(tInstruction[9]);
+lr:
+    if (top == pcstack) err("Unmatched ']'");
+    top--;
+    |  cmp  byte [PTR], 0
+    |  jne  =>(*top-1)
+    |=>(*top-2):
+          p++;
+    goto *(tInstruction[9]);
+
+
+    // Function epilogue.
+le:
+    |  pop  PTR
+    |  ret
+
+    void (*fptr)(char*) = jitcode(&state);
+    char *mem = calloc(30000, 1);
+    fptr(mem);
+    free(mem);
+    free_jitcode(fptr);
+    return 0;
 }
-
-
-
-
